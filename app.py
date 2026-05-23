@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request, render_template
-from db import get_connection
+from pnr import get_connection
 
 app = Flask(__name__)
 
@@ -92,6 +92,72 @@ def search_passengers():
     finally:
         conn.close()
 
+# fetch travel doc
+@app.get("/travel_documents/<document_type>/<document_no>")
+def get_document(document_type, document_no):
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """SELECT td.* FROM travel_documents td
+                JOIN passengers p ON p.document_type = td.document_type
+                AND p.document_no = td.document_no
+                WHERE p.id = ?""",
+            (document_type, document_no)
+        ).fetchone()
+        return jsonify(dict(row) if row else {})
+    finally:
+        conn.close()
+
+# create travel doc
+@app.post("/travel_documents")
+def create_document():
+    conn = get_connection()
+    data = request.get_json()
+    try:
+        row = conn.execute(
+            """INSERT INTO travel_documents (document_type, document_no, last_name, first_name, 
+            nationality, country_of_issue, date_of_birth, date_of_expiry)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (data["document_type"], data["document_no"], data["last_name"],
+             data["first_name"], data["nationality"], data["country_of_issue"], 
+             data["date_of_birth"], data["date_of_expiry"])
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    finally: conn.close()
+
+# update travel doc
+@app.put("/travel_documents/<document_type>/<document_no>")
+def update_document(document_type, document_no):
+    data = request.get_json()
+    conn = get_connection()
+    try:
+        conn.execute(
+            """UPDATE travel_documents SET nationality=?, country_of_issue=?,
+               date_of_birth=?, date_of_expiry=?
+               WHERE document_type=? AND document_no=?""",
+            (data["nationality"], data["country_of_issue"],
+             data["date_of_birth"], data["date_of_expiry"],
+             document_type, document_no)
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    finally:
+        conn.close()
+
+# delete travel doc
+@app.delete("/travel_documents/<document_type>/<document_no>")
+def delete_document(document_type, document_no):
+    conn = get_connection()
+    try:
+        conn.execute(
+            "DELETE FROM travel_documents WHERE document_type=? AND document_no=?",
+            (document_type, document_no)
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    finally:
+        conn.close()
 
 @app.get("/ssr_codes")
 def list_ssr_codes():

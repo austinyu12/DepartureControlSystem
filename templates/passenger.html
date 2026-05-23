@@ -50,58 +50,58 @@
 </main>
 <script>
     function onSearchTypeChange() {
-    const type = document.getElementById("search-type").value;
-    document.getElementById("name-inputs").style.display = type === "name" ? "" : "none";
-    document.getElementById("seat-inputs").style.display = type === "seat" ? "" : "none";
+        const type = document.getElementById("search-type").value;
+        document.getElementById("name-inputs").style.display = type === "name" ? "" : "none";
+        document.getElementById("seat-inputs").style.display = type === "seat" ? "" : "none";
     }
 
     function doSearch() {
-    const type = document.getElementById("search-type").value;
-    let url;
+        const type = document.getElementById("search-type").value;
+        let url;
 
-    if (type === "name") {
-        const first = document.getElementById("first-name").value.trim();
-        const last = document.getElementById("last-name").value.trim();
-        if (!first && !last) { setStatus("Enter at least one name."); return; }
-        url = `/passengers/search?last_name=${encodeURIComponent(last)}`;
-    } else {
-        const seat = document.getElementById("seat-input").value.trim();
-        const airline = document.getElementById("airline-input").value.trim();
-        const flightNum = document.getElementById("flightnum-input").value.trim();
-        const date = document.getElementById("date-input").value.trim();
-        if (!seat || !airline || !flightNum || !date) { setStatus("All fields required."); return; }
-        url = `/passengers/search?seat_num=${encodeURIComponent(seat)}&flight_num=${encodeURIComponent(airline + " " + flightNum)}&departure_date=${encodeURIComponent(date)}`;
-    }
+        if (type === "name") {
+            const first = document.getElementById("first-name").value.trim();
+            const last = document.getElementById("last-name").value.trim();
+            if (!first && !last) { setStatus("Enter at least one name."); return; }
+            url = `/passengers/search?last_name=${encodeURIComponent(last)}`;
+        } else {
+            const seat = document.getElementById("seat-input").value.trim();
+            const airline = document.getElementById("airline-input").value.trim();
+            const flightNum = document.getElementById("flightnum-input").value.trim();
+            const date = document.getElementById("date-input").value.trim();
+            if (!seat || !airline || !flightNum || !date) { setStatus("All fields required."); return; }
+            url = `/passengers/search?seat_num=${encodeURIComponent(seat)}&flight_num=${encodeURIComponent(airline + " " + flightNum)}&departure_date=${encodeURIComponent(date)}`;
+        }
 
-    fetch(url)
-        .then(r => r.json())
-        .then(data => renderResults(data))
-        .catch(() => setStatus("Request failed."));
+        fetch(url)
+            .then(r => r.json())
+            .then(data => renderResults(data))
+            .catch(() => setStatus("Request failed."));
     }
 
     function renderResults(rows) {
-    const tbody = document.getElementById("results-body");
-    const table = document.getElementById("results-table");
-    tbody.innerHTML = "";
-    if (rows.length === 0) { setStatus("No results found."); table.style.display = "none"; return; }
-    setStatus(`${rows.length} result${rows.length !== 1 ? "s" : ""}`);
-    rows.forEach(p => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-        <td>${p.seat ?? ""}</td>
-        <td>${p.last_name ?? ""}</td>
-        <td>${p.first_name ?? ""}</td>
-        <td>${p.cabin_class ?? ""}</td>
-        <td>${p.ssr_codes ?? ""}</td>
-        <td>${p.record_locator ?? ""}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-    table.style.display = "table";
+        const tbody = document.getElementById("results-body");
+        const table = document.getElementById("results-table");
+        tbody.innerHTML = "";
+        if (rows.length === 0) { setStatus("No results found."); table.style.display = "none"; return; }
+        setStatus(`${rows.length} result${rows.length !== 1 ? "s" : ""}`);
+        rows.forEach(p => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+            <td>${p.seat ?? ""}</td>
+            <td>${p.last_name ?? ""}</td>
+            <td>${p.first_name ?? ""}</td>
+            <td>${p.cabin_class ?? ""}</td>
+            <td>${p.ssr_codes ?? ""}</td>
+            <td>${p.record_locator ?? ""}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        table.style.display = "table";
     }
 
     function setStatus(msg) {
-    document.getElementById("status").textContent = msg;
+        document.getElementById("status").textContent = msg;
     }
 </script>
 

@@ -1,6 +1,6 @@
 import openpyxl
 from datetime import datetime
-from db import get_connection, init_db
+from pnr import get_connection, init_db
 
 
 def parse_date(value):
@@ -26,6 +26,7 @@ def load_manifest(xlsx_path):
         _seed_ssr_codes(conn, wb)
         flight_key = _insert_flight(conn, wb)
         _insert_passengers(conn, wb, flight_key)
+        _insert_travel_documents(conn, wb)
 
     conn.close()
     print(f"Loaded manifest from {xlsx_path}")
@@ -107,6 +108,30 @@ def _insert_passengers(conn, wb, flight_key):
             ),
         )
 
+def _insert_travel_documents(conn, wb):
+    ws = wb["API — Passport Data"]
+    headers = [cell.value for cell in next(ws.iter_rows(min_row=3, max_row=3))]
+    col = {name: idx for idx, name in enumerate(headers)}
+
+    for row in ws.iter_rows(min_row=4, values_only=True):
+        if row[col["No."]] is None:
+            continue
+        conn.execute(
+            """INSERT OR REPLACE INTO travel_documents (
+                document_type, document_no, last_name, first_name,
+                nationality, country_of_issue, date_of_birth, date_of_expiry
+            ) VALUES ('PP', ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                row[col["Passport No."]],
+                row[col["Last Name"]],
+                row[col["First Name"]],
+                row[col["Nationality"]],
+                row[col["Issue Country"]],
+                parse_date(row[col["Date of Birth"]]),
+                parse_date(row[col["Passport Expiry"]]),
+            ),
+        )
+
 
 if __name__ == "__main__":
     import sys
@@ -121,7 +146,7 @@ if __name__ == "__main__":
     load_manifest(xlsx_path)
 
     # Quick sanity check
-    from db import get_connection
+    from pnr import get_connection
     conn = get_connection()
     pax_count = conn.execute("SELECT COUNT(*) FROM passengers").fetchone()[0]
     ssr_count = conn.execute("SELECT COUNT(*) FROM passengers WHERE ssr_codes IS NOT NULL").fetchone()[0]
