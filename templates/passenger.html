@@ -77,6 +77,7 @@
             .then(r => r.json())
             .then(data => renderResults(data))
             .catch(() => setStatus("Request failed."));
+            // somewhere here, also fetch travel doc info
     }
 
     function renderResults(rows) {

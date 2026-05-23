@@ -98,10 +98,7 @@ def get_document(document_type, document_no):
     conn = get_connection()
     try:
         row = conn.execute(
-            """SELECT td.* FROM travel_documents td
-                JOIN passengers p ON p.document_type = td.document_type
-                AND p.document_no = td.document_no
-                WHERE p.id = ?""",
+            "SELECT * FROM travel_documents WHERE document_type=? AND document_no=?",
             (document_type, document_no)
         ).fetchone()
         return jsonify(dict(row) if row else {})
@@ -133,10 +130,11 @@ def update_document(document_type, document_no):
     conn = get_connection()
     try:
         conn.execute(
-            """UPDATE travel_documents SET nationality=?, country_of_issue=?,
-               date_of_birth=?, date_of_expiry=?
+            """UPDATE travel_documents SET last_name=?, first_name=?,
+               nationality=?, country_of_issue=?, date_of_birth=?, date_of_expiry=?
                WHERE document_type=? AND document_no=?""",
-            (data["nationality"], data["country_of_issue"],
+            (data["last_name"], data["first_name"],
+             data["nationality"], data["country_of_issue"],
              data["date_of_birth"], data["date_of_expiry"],
              document_type, document_no)
         )
