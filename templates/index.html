@@ -87,6 +87,34 @@
     .empty { text-align: center; padding: 40px; color: #888; }
 
     #input-wrapper { display: flex; align-items: center; }
+
+    #doc-panel {
+      margin-top: 24px;
+      background: white;
+      border-radius: 8px;
+      padding: 20px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      max-width: 520px;
+    }
+
+    #doc-panel h3 { margin-bottom: 14px; font-size: 1rem; }
+
+    #doc-table { border-collapse: collapse; width: 100%; margin-bottom: 12px; }
+    #doc-table th, #doc-table td { border: 1px solid #eef0f4; padding: 7px 12px; text-align: left; font-size: 0.9rem; }
+    #doc-table th { background: #f4f6f9; width: 40%; font-weight: 500; }
+
+    .form-row { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+    .form-row label { width: 150px; font-weight: 500; flex-shrink: 0; }
+    .form-row input { flex: 1; }
+
+    .btn-row { margin-top: 12px; display: flex; gap: 8px; }
+
+    button.secondary { background: #6b7280; }
+    button.secondary:hover { background: #4b5563; }
+    button.danger { background: #c0392b; }
+    button.danger:hover { background: #a93226; }
+
+    #doc-status { margin-top: 8px; font-size: 0.85rem; color: #c0392b; }
   </style>
 </head>
 <body>
@@ -148,14 +176,58 @@
         <th>Cabin Class</th>
         <th>SSR Codes</th>
         <th>Record Locator</th>
+        <th>Travel Doc</th>
       </tr>
     </thead>
     <tbody id="results-body"></tbody>
   </table>
+
+  <div id="doc-panel" style="display:none;">
+    <h3>Travel Document — <span id="doc-passenger-name"></span></h3>
+
+    <div id="doc-view">
+      <table id="doc-table">
+        <tbody>
+          <tr><th>Type</th><td id="dv-type"></td></tr>
+          <tr><th>Number</th><td id="dv-no"></td></tr>
+          <tr><th>Last Name</th><td id="dv-last"></td></tr>
+          <tr><th>First Name</th><td id="dv-first"></td></tr>
+          <tr><th>Nationality</th><td id="dv-nationality"></td></tr>
+          <tr><th>Country of Issue</th><td id="dv-country"></td></tr>
+          <tr><th>Date of Birth</th><td id="dv-dob"></td></tr>
+          <tr><th>Date of Expiry</th><td id="dv-expiry"></td></tr>
+        </tbody>
+      </table>
+      <div class="btn-row">
+        <button type="button" onclick="showEditForm()">Edit</button>
+        <button type="button" class="danger" onclick="deleteDoc()">Delete</button>
+      </div>
+    </div>
+
+    <div id="doc-form" style="display:none;">
+      <input type="hidden" id="form-mode" value="add">
+      <div class="form-row"><label>Type</label><input type="text" id="form-doc-type" value="PP" readonly></div>
+      <div class="form-row"><label>Number</label><input type="text" id="form-doc-no" placeholder="e.g. A12345678"></div>
+      <div class="form-row"><label>Last Name</label><input type="text" id="form-last-name"></div>
+      <div class="form-row"><label>First Name</label><input type="text" id="form-first-name"></div>
+      <div class="form-row"><label>Nationality</label><input type="text" id="form-nationality" placeholder="e.g. USA"></div>
+      <div class="form-row"><label>Country of Issue</label><input type="text" id="form-country" placeholder="e.g. USA"></div>
+      <div class="form-row"><label>Date of Birth</label><input type="text" id="form-dob" placeholder="YYYY-MM-DD"></div>
+      <div class="form-row"><label>Date of Expiry</label><input type="text" id="form-expiry" placeholder="YYYY-MM-DD"></div>
+      <div class="btn-row">
+        <button type="button" onclick="submitDoc()">Save</button>
+        <button type="button" class="secondary" onclick="cancelForm()">Cancel</button>
+      </div>
+    </div>
+
+    <div id="doc-status"></div>
+  </div>
 </main>
 
 <script>
   let allPassengers = [];
+  let displayedPassengers = [];
+  let currentDocIdx = -1;
   let currFlightNum = "";
   let currFlightDate = "";
   // Populate SSR dropdown on page load
@@ -235,6 +307,7 @@
   }
 
   function renderResults(rows) {
+    displayedPassengers = rows;
     const tbody = document.getElementById("results-body");
     const table = document.getElementById("results-table");
     tbody.innerHTML = "";
@@ -242,11 +315,13 @@
     if (rows.length === 0) {
       setStatus("No results found.", false);
       table.style.display = "none";
+      document.getElementById("doc-panel").style.display = "none";
       return;
     }
 
     setStatus(`${rows.length} result${rows.length !== 1 ? "s" : ""}`, false);
-    rows.forEach(p => {
+    rows.forEach((p, i) => {
+      const hasDoc = p.document_type && p.document_no;
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${p.seat ?? ""}</td>
@@ -255,10 +330,150 @@
         <td>${p.cabin_class ?? ""}</td>
         <td>${p.ssr_codes ?? ""}</td>
         <td>${p.record_locator ?? ""}</td>
+        <td><button type="button" onclick="openDoc(${i})">${hasDoc ? "View Doc" : "Add Doc"}</button></td>
       `;
       tbody.appendChild(tr);
     });
     table.style.display = "table";
+  }
+
+  function openDoc(idx) {
+    currentDocIdx = idx;
+    const p = displayedPassengers[idx];
+    document.getElementById("doc-passenger-name").textContent = `${p.first_name} ${p.last_name}`;
+    document.getElementById("doc-panel").style.display = "";
+    document.getElementById("doc-status").textContent = "";
+
+    if (p.document_type && p.document_no) {
+      fetch(`/travel_documents/${p.document_type}/${p.document_no}`)
+        .then(r => r.json())
+        .then(doc => showDoc(doc));
+    } else {
+      showAddForm();
+    }
+  }
+
+  function showDoc(doc) {
+    document.getElementById("doc-view").style.display = "";
+    document.getElementById("doc-form").style.display = "none";
+    document.getElementById("dv-type").textContent = doc.document_type;
+    document.getElementById("dv-no").textContent = doc.document_no;
+    document.getElementById("dv-last").textContent = doc.last_name;
+    document.getElementById("dv-first").textContent = doc.first_name;
+    document.getElementById("dv-nationality").textContent = doc.nationality;
+    document.getElementById("dv-country").textContent = doc.country_of_issue;
+    document.getElementById("dv-dob").textContent = doc.date_of_birth;
+    document.getElementById("dv-expiry").textContent = doc.date_of_expiry;
+  }
+
+  function showAddForm() {
+    const p = displayedPassengers[currentDocIdx];
+    document.getElementById("doc-view").style.display = "none";
+    document.getElementById("doc-form").style.display = "";
+    document.getElementById("form-mode").value = "add";
+    document.getElementById("form-doc-type").value = "PP";
+    document.getElementById("form-doc-no").value = "";
+    document.getElementById("form-last-name").value = p.last_name ?? "";
+    document.getElementById("form-first-name").value = p.first_name ?? "";
+    document.getElementById("form-nationality").value = "";
+    document.getElementById("form-country").value = "";
+    document.getElementById("form-dob").value = "";
+    document.getElementById("form-expiry").value = "";
+  }
+
+  function showEditForm() {
+    const p = displayedPassengers[currentDocIdx];
+    fetch(`/travel_documents/${p.document_type}/${p.document_no}`)
+      .then(r => r.json())
+      .then(doc => {
+        document.getElementById("doc-view").style.display = "none";
+        document.getElementById("doc-form").style.display = "";
+        document.getElementById("form-mode").value = "edit";
+        document.getElementById("form-doc-type").value = doc.document_type;
+        document.getElementById("form-doc-no").value = doc.document_no;
+        document.getElementById("form-last-name").value = doc.last_name;
+        document.getElementById("form-first-name").value = doc.first_name;
+        document.getElementById("form-nationality").value = doc.nationality;
+        document.getElementById("form-country").value = doc.country_of_issue;
+        document.getElementById("form-dob").value = doc.date_of_birth;
+        document.getElementById("form-expiry").value = doc.date_of_expiry;
+      });
+  }
+
+  function submitDoc() {
+    const mode = document.getElementById("form-mode").value;
+    const docType = document.getElementById("form-doc-type").value.trim();
+    const docNo = document.getElementById("form-doc-no").value.trim();
+    const body = {
+      document_type: docType,
+      document_no: docNo,
+      last_name: document.getElementById("form-last-name").value.trim(),
+      first_name: document.getElementById("form-first-name").value.trim(),
+      nationality: document.getElementById("form-nationality").value.trim(),
+      country_of_issue: document.getElementById("form-country").value.trim(),
+      date_of_birth: document.getElementById("form-dob").value.trim(),
+      date_of_expiry: document.getElementById("form-expiry").value.trim(),
+    };
+
+    let req;
+    if (mode === "add") {
+      req = fetch("/travel_documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } else {
+      const p = displayedPassengers[currentDocIdx];
+      req = fetch(`/travel_documents/${p.document_type}/${p.document_no}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    }
+
+    req
+      .then(r => r.json())
+      .then(resp => {
+        if (resp.error) { setDocStatus("Error: " + resp.error); return; }
+        displayedPassengers[currentDocIdx].document_type = docType;
+        displayedPassengers[currentDocIdx].document_no = docNo;
+        // Refresh the row's button label without re-rendering the whole table
+        const btn = document.getElementById("results-body")
+          .querySelectorAll("tr")[currentDocIdx].querySelector("button");
+        btn.textContent = "View Doc";
+        openDoc(currentDocIdx);
+      })
+      .catch(() => setDocStatus("Request failed."));
+  }
+
+  function deleteDoc() {
+    if (!confirm("Delete this travel document?")) return;
+    const p = displayedPassengers[currentDocIdx];
+    fetch(`/travel_documents/${p.document_type}/${p.document_no}`, { method: "DELETE" })
+      .then(r => r.json())
+      .then(resp => {
+        if (resp.error) { setDocStatus("Error: " + resp.error); return; }
+        displayedPassengers[currentDocIdx].document_type = null;
+        displayedPassengers[currentDocIdx].document_no = null;
+        const btn = document.getElementById("results-body")
+          .querySelectorAll("tr")[currentDocIdx].querySelector("button");
+        btn.textContent = "Add Doc";
+        showAddForm();
+      })
+      .catch(() => setDocStatus("Request failed."));
+  }
+
+  function cancelForm() {
+    const p = displayedPassengers[currentDocIdx];
+    if (p.document_type && p.document_no) {
+      openDoc(currentDocIdx);
+    } else {
+      document.getElementById("doc-panel").style.display = "none";
+    }
+  }
+
+  function setDocStatus(msg) {
+    document.getElementById("doc-status").textContent = msg;
   }
 
   function setStatus(msg, isError) {

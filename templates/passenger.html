@@ -4,106 +4,407 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Passenger Search</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f4f6f9; color: #1a1a2e; }
+
+    header {
+      background: #1a1a2e;
+      color: white;
+      padding: 16px 32px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    main { max-width: 1100px; margin: 32px auto; padding: 0 24px; }
+
+    .search-bar {
+      background: white;
+      border-radius: 8px;
+      padding: 20px 24px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      flex-wrap: wrap;
+    }
+
+    .search-bar label { font-weight: 500; white-space: nowrap; }
+
+    select, input[type="text"] {
+      padding: 8px 12px;
+      border: 1px solid #cdd0d8;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      background: white;
+      min-width: 180px;
+    }
+
+    select:focus, input[type="text"]:focus {
+      outline: none;
+      border-color: #4f6ef7;
+    }
+
+    button {
+      padding: 8px 20px;
+      background: #4f6ef7;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover { background: #3a58d6; }
+
+    .status {
+      margin: 16px 0 8px;
+      font-size: 0.9rem;
+      color: #555;
+      min-height: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      font-size: 0.9rem;
+    }
+
+    thead { background: #1a1a2e; color: white; }
+    th { padding: 12px 14px; text-align: left; font-weight: 500; }
+    td { padding: 10px 14px; border-bottom: 1px solid #eef0f4; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f0f3ff; }
+
+    #doc-panel {
+      margin-top: 24px;
+      background: white;
+      border-radius: 8px;
+      padding: 20px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      max-width: 520px;
+    }
+
+    #doc-panel h3 { margin-bottom: 14px; font-size: 1rem; }
+
+    #doc-table { border-collapse: collapse; width: 100%; margin-bottom: 12px; }
+    #doc-table th, #doc-table td { border: 1px solid #eef0f4; padding: 7px 12px; text-align: left; font-size: 0.9rem; }
+    #doc-table th { background: #f4f6f9; width: 40%; font-weight: 500; }
+
+    .form-row { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+    .form-row label { width: 150px; font-weight: 500; flex-shrink: 0; }
+    .form-row input { flex: 1; min-width: 0; }
+
+    .btn-row { margin-top: 12px; display: flex; gap: 8px; }
+
+    button.secondary { background: #6b7280; }
+    button.secondary:hover { background: #4b5563; }
+    button.danger { background: #c0392b; }
+    button.danger:hover { background: #a93226; }
+
+    #doc-status { margin-top: 8px; font-size: 0.85rem; color: #c0392b; }
+  </style>
 </head>
 <body>
 
-<header>Passenger Search</header>
+<header>
+  Passenger Search
+  <a href="/" style="color:white; float:right; font-size:0.9rem;">Manifest Viewer</a>
+</header>
 
 <main>
-    <div>
+  <div class="search-bar">
     <label>Search by:</label>
     <select id="search-type" onchange="onSearchTypeChange()">
-        <option value="name">Name</option>
-        <option value="seat">Seat</option>
+      <option value="name">Name</option>
+      <option value="seat">Seat</option>
     </select>
-    </div>
 
-    <div id="name-inputs">
-    <input type="text" id="last-name" placeholder="Last name" />
-    <input type="text" id="first-name" placeholder="First name" />
+    <div id="name-inputs" style="display:contents;">
+      <input type="text" id="last-name" placeholder="Last name">
+      <input type="text" id="first-name" placeholder="First name">
     </div>
 
     <div id="seat-inputs" style="display:none;">
-    <input type="text" id="seat-input" placeholder="Seat e.g. 12A" />
-    <input type="text" id="airline-input" placeholder="Airline e.g. AB" />
-    <input type="text" id="flightnum-input" placeholder="Flight No. e.g. 123" />
-    <input type="text" id="date-input" placeholder="Date e.g. 2026-04-07" />
+      <input type="text" id="seat-input" placeholder="Seat e.g. 12A">
+      <input type="text" id="airline-input" placeholder="Airline e.g. AB">
+      <input type="text" id="flightnum-input" placeholder="Flight No. e.g. 123">
+      <input type="text" id="date-input" placeholder="Date e.g. 2026-04-07">
     </div>
 
-    <button onclick="doSearch()">Search</button>
+    <button type="button" onclick="doSearch()">Search</button>
+  </div>
 
-    <div id="status"></div>
+  <div class="status" id="status"></div>
 
-    <table id="results-table" style="display:none;">
+  <table id="results-table" style="display:none;">
     <thead>
-        <tr>
+      <tr>
         <th>Seat</th>
         <th>Last Name</th>
         <th>First Name</th>
         <th>Cabin Class</th>
         <th>SSR Codes</th>
         <th>Record Locator</th>
-        </tr>
+        <th>Travel Doc</th>
+      </tr>
     </thead>
     <tbody id="results-body"></tbody>
-    </table>
+  </table>
+
+  <div id="doc-panel" style="display:none;">
+    <h3>Travel Document — <span id="doc-passenger-name"></span></h3>
+
+    <div id="doc-view">
+      <table id="doc-table">
+        <tbody>
+          <tr><th>Type</th><td id="dv-type"></td></tr>
+          <tr><th>Number</th><td id="dv-no"></td></tr>
+          <tr><th>Last Name</th><td id="dv-last"></td></tr>
+          <tr><th>First Name</th><td id="dv-first"></td></tr>
+          <tr><th>Nationality</th><td id="dv-nationality"></td></tr>
+          <tr><th>Country of Issue</th><td id="dv-country"></td></tr>
+          <tr><th>Date of Birth</th><td id="dv-dob"></td></tr>
+          <tr><th>Date of Expiry</th><td id="dv-expiry"></td></tr>
+        </tbody>
+      </table>
+      <div class="btn-row">
+        <button type="button" onclick="showEditForm()">Edit</button>
+        <button type="button" class="danger" onclick="deleteDoc()">Delete</button>
+      </div>
+    </div>
+
+    <div id="doc-form" style="display:none;">
+      <input type="hidden" id="form-mode" value="add">
+      <div class="form-row"><label>Type</label><input type="text" id="form-doc-type" value="PP" readonly></div>
+      <div class="form-row"><label>Number</label><input type="text" id="form-doc-no" placeholder="e.g. A12345678"></div>
+      <div class="form-row"><label>Last Name</label><input type="text" id="form-last-name"></div>
+      <div class="form-row"><label>First Name</label><input type="text" id="form-first-name"></div>
+      <div class="form-row"><label>Nationality</label><input type="text" id="form-nationality" placeholder="e.g. USA"></div>
+      <div class="form-row"><label>Country of Issue</label><input type="text" id="form-country" placeholder="e.g. USA"></div>
+      <div class="form-row"><label>Date of Birth</label><input type="text" id="form-dob" placeholder="YYYY-MM-DD"></div>
+      <div class="form-row"><label>Date of Expiry</label><input type="text" id="form-expiry" placeholder="YYYY-MM-DD"></div>
+      <div class="btn-row">
+        <button type="button" onclick="submitDoc()">Save</button>
+        <button type="button" class="secondary" onclick="cancelForm()">Cancel</button>
+      </div>
+    </div>
+
+    <div id="doc-status"></div>
+  </div>
 </main>
+
 <script>
-    function onSearchTypeChange() {
-        const type = document.getElementById("search-type").value;
-        document.getElementById("name-inputs").style.display = type === "name" ? "" : "none";
-        document.getElementById("seat-inputs").style.display = type === "seat" ? "" : "none";
+  let searchResults = [];
+  let currentDocIdx = -1;
+
+  function onSearchTypeChange() {
+    const type = document.getElementById("search-type").value;
+    document.getElementById("name-inputs").style.display = type === "name" ? "contents" : "none";
+    document.getElementById("seat-inputs").style.display = type === "seat" ? "" : "none";
+  }
+
+  function doSearch() {
+    const type = document.getElementById("search-type").value;
+    let url;
+
+    if (type === "name") {
+      const last = document.getElementById("last-name").value.trim();
+      const first = document.getElementById("first-name").value.trim();
+      if (!last && !first) { setStatus("Enter at least one name."); return; }
+      url = `/passengers/search?last_name=${encodeURIComponent(last)}`;
+    } else {
+      const seat = document.getElementById("seat-input").value.trim();
+      const airline = document.getElementById("airline-input").value.trim();
+      const flightNum = document.getElementById("flightnum-input").value.trim();
+      const date = document.getElementById("date-input").value.trim();
+      if (!seat || !airline || !flightNum || !date) { setStatus("All fields required."); return; }
+      url = `/passengers/search?seat_num=${encodeURIComponent(seat)}&flight_num=${encodeURIComponent(airline + " " + flightNum)}&departure_date=${encodeURIComponent(date)}`;
     }
 
-    function doSearch() {
-        const type = document.getElementById("search-type").value;
-        let url;
+    document.getElementById("doc-panel").style.display = "none";
+    fetch(url)
+      .then(r => r.json())
+      .then(data => renderResults(data))
+      .catch(() => setStatus("Request failed."));
+  }
 
-        if (type === "name") {
-            const first = document.getElementById("first-name").value.trim();
-            const last = document.getElementById("last-name").value.trim();
-            if (!first && !last) { setStatus("Enter at least one name."); return; }
-            url = `/passengers/search?last_name=${encodeURIComponent(last)}`;
-        } else {
-            const seat = document.getElementById("seat-input").value.trim();
-            const airline = document.getElementById("airline-input").value.trim();
-            const flightNum = document.getElementById("flightnum-input").value.trim();
-            const date = document.getElementById("date-input").value.trim();
-            if (!seat || !airline || !flightNum || !date) { setStatus("All fields required."); return; }
-            url = `/passengers/search?seat_num=${encodeURIComponent(seat)}&flight_num=${encodeURIComponent(airline + " " + flightNum)}&departure_date=${encodeURIComponent(date)}`;
-        }
+  function renderResults(rows) {
+    searchResults = rows;
+    const tbody = document.getElementById("results-body");
+    const table = document.getElementById("results-table");
+    tbody.innerHTML = "";
+    if (rows.length === 0) {
+      setStatus("No results found.");
+      table.style.display = "none";
+      document.getElementById("doc-panel").style.display = "none";
+      return;
+    }
+    setStatus(`${rows.length} result${rows.length !== 1 ? "s" : ""}`);
+    rows.forEach((p, i) => {
+      const hasDoc = p.document_type && p.document_no;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${p.seat ?? ""}</td>
+        <td>${p.last_name ?? ""}</td>
+        <td>${p.first_name ?? ""}</td>
+        <td>${p.cabin_class ?? ""}</td>
+        <td>${p.ssr_codes ?? ""}</td>
+        <td>${p.record_locator ?? ""}</td>
+        <td><button type="button" onclick="openDoc(${i})">${hasDoc ? "View Doc" : "Add Doc"}</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    table.style.display = "table";
+  }
 
-        fetch(url)
-            .then(r => r.json())
-            .then(data => renderResults(data))
-            .catch(() => setStatus("Request failed."));
-            // somewhere here, also fetch travel doc info
+  function openDoc(idx) {
+    currentDocIdx = idx;
+    const p = searchResults[idx];
+    document.getElementById("doc-passenger-name").textContent = `${p.first_name} ${p.last_name}`;
+    document.getElementById("doc-panel").style.display = "";
+    document.getElementById("doc-status").textContent = "";
+
+    if (p.document_type && p.document_no) {
+      fetch(`/travel_documents/${p.document_type}/${p.document_no}`)
+        .then(r => r.json())
+        .then(doc => showDoc(doc));
+    } else {
+      showAddForm();
+    }
+  }
+
+  function showDoc(doc) {
+    document.getElementById("doc-view").style.display = "";
+    document.getElementById("doc-form").style.display = "none";
+    document.getElementById("dv-type").textContent = doc.document_type;
+    document.getElementById("dv-no").textContent = doc.document_no;
+    document.getElementById("dv-last").textContent = doc.last_name;
+    document.getElementById("dv-first").textContent = doc.first_name;
+    document.getElementById("dv-nationality").textContent = doc.nationality;
+    document.getElementById("dv-country").textContent = doc.country_of_issue;
+    document.getElementById("dv-dob").textContent = doc.date_of_birth;
+    document.getElementById("dv-expiry").textContent = doc.date_of_expiry;
+  }
+
+  function showAddForm() {
+    const p = searchResults[currentDocIdx];
+    document.getElementById("doc-view").style.display = "none";
+    document.getElementById("doc-form").style.display = "";
+    document.getElementById("form-mode").value = "add";
+    document.getElementById("form-doc-type").value = "PP";
+    document.getElementById("form-doc-no").value = "";
+    document.getElementById("form-last-name").value = p.last_name ?? "";
+    document.getElementById("form-first-name").value = p.first_name ?? "";
+    document.getElementById("form-nationality").value = "";
+    document.getElementById("form-country").value = "";
+    document.getElementById("form-dob").value = "";
+    document.getElementById("form-expiry").value = "";
+  }
+
+  function showEditForm() {
+    const p = searchResults[currentDocIdx];
+    fetch(`/travel_documents/${p.document_type}/${p.document_no}`)
+      .then(r => r.json())
+      .then(doc => {
+        document.getElementById("doc-view").style.display = "none";
+        document.getElementById("doc-form").style.display = "";
+        document.getElementById("form-mode").value = "edit";
+        document.getElementById("form-doc-type").value = doc.document_type;
+        document.getElementById("form-doc-no").value = doc.document_no;
+        document.getElementById("form-last-name").value = doc.last_name;
+        document.getElementById("form-first-name").value = doc.first_name;
+        document.getElementById("form-nationality").value = doc.nationality;
+        document.getElementById("form-country").value = doc.country_of_issue;
+        document.getElementById("form-dob").value = doc.date_of_birth;
+        document.getElementById("form-expiry").value = doc.date_of_expiry;
+      });
+  }
+
+  function submitDoc() {
+    const mode = document.getElementById("form-mode").value;
+    const docType = document.getElementById("form-doc-type").value.trim();
+    const docNo = document.getElementById("form-doc-no").value.trim();
+    const body = {
+      document_type: docType,
+      document_no: docNo,
+      last_name: document.getElementById("form-last-name").value.trim(),
+      first_name: document.getElementById("form-first-name").value.trim(),
+      nationality: document.getElementById("form-nationality").value.trim(),
+      country_of_issue: document.getElementById("form-country").value.trim(),
+      date_of_birth: document.getElementById("form-dob").value.trim(),
+      date_of_expiry: document.getElementById("form-expiry").value.trim(),
+    };
+
+    let req;
+    if (mode === "add") {
+      req = fetch("/travel_documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } else {
+      const p = searchResults[currentDocIdx];
+      req = fetch(`/travel_documents/${p.document_type}/${p.document_no}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
     }
 
-    function renderResults(rows) {
-        const tbody = document.getElementById("results-body");
-        const table = document.getElementById("results-table");
-        tbody.innerHTML = "";
-        if (rows.length === 0) { setStatus("No results found."); table.style.display = "none"; return; }
-        setStatus(`${rows.length} result${rows.length !== 1 ? "s" : ""}`);
-        rows.forEach(p => {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-            <td>${p.seat ?? ""}</td>
-            <td>${p.last_name ?? ""}</td>
-            <td>${p.first_name ?? ""}</td>
-            <td>${p.cabin_class ?? ""}</td>
-            <td>${p.ssr_codes ?? ""}</td>
-            <td>${p.record_locator ?? ""}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-        table.style.display = "table";
-    }
+    req
+      .then(r => r.json())
+      .then(resp => {
+        if (resp.error) { setDocStatus("Error: " + resp.error); return; }
+        searchResults[currentDocIdx].document_type = docType;
+        searchResults[currentDocIdx].document_no = docNo;
+        const btn = document.getElementById("results-body")
+          .querySelectorAll("tr")[currentDocIdx].querySelector("button");
+        btn.textContent = "View Doc";
+        openDoc(currentDocIdx);
+      })
+      .catch(() => setDocStatus("Request failed."));
+  }
 
-    function setStatus(msg) {
-        document.getElementById("status").textContent = msg;
+  function deleteDoc() {
+    if (!confirm("Delete this travel document?")) return;
+    const p = searchResults[currentDocIdx];
+    fetch(`/travel_documents/${p.document_type}/${p.document_no}`, { method: "DELETE" })
+      .then(r => r.json())
+      .then(resp => {
+        if (resp.error) { setDocStatus("Error: " + resp.error); return; }
+        searchResults[currentDocIdx].document_type = null;
+        searchResults[currentDocIdx].document_no = null;
+        const btn = document.getElementById("results-body")
+          .querySelectorAll("tr")[currentDocIdx].querySelector("button");
+        btn.textContent = "Add Doc";
+        showAddForm();
+      })
+      .catch(() => setDocStatus("Request failed."));
+  }
+
+  function cancelForm() {
+    const p = searchResults[currentDocIdx];
+    if (p.document_type && p.document_no) {
+      openDoc(currentDocIdx);
+    } else {
+      document.getElementById("doc-panel").style.display = "none";
     }
+  }
+
+  function setStatus(msg) {
+    document.getElementById("status").textContent = msg;
+  }
+
+  function setDocStatus(msg) {
+    document.getElementById("doc-status").textContent = msg;
+  }
 </script>
 
 </body>
