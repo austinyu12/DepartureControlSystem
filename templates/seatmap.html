@@ -178,6 +178,17 @@
     el.className = isError ? "status error" : "status";
   }
 
+  // Auto-load a flight if arrived here via a deep link (?flight_no=...&flight_date=...&origin=...&destination=...)
+  (function loadFromQueryParams() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("flight_no")) return;
+    document.getElementById("flight-num").value = params.get("flight_no") ?? "";
+    document.getElementById("flight-date").value = params.get("flight_date") ?? "";
+    document.getElementById("flight-origin").value = params.get("origin") ?? "";
+    document.getElementById("flight-dest").value = params.get("destination") ?? "";
+    loadSeatMap();
+  })();
+
   async function loadSeatMap() {
     const flightNo = document.getElementById("flight-num").value.trim();
     const flightDate = document.getElementById("flight-date").value.trim();

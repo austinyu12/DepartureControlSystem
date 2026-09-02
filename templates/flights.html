@@ -66,6 +66,7 @@
         <th>Destination</th>
         <th>Operator</th>
         <th>Aircraft</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody id="flights-body"></tbody>
@@ -94,6 +95,10 @@
 
       setStatus(`${rows.length} flight${rows.length !== 1 ? "s" : ""}`, false);
       rows.forEach(f => {
+        const params = `flight_no=${encodeURIComponent(f.flight_no)}`
+                     + `&flight_date=${encodeURIComponent(f.flight_date)}`
+                     + `&origin=${encodeURIComponent(f.origin)}`
+                     + `&destination=${encodeURIComponent(f.destination)}`;
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${f.flight_no ?? ""}</td>
@@ -102,6 +107,11 @@
           <td>${f.destination ?? ""}</td>
           <td>${f.operator ?? ""}</td>
           <td>${f.aircraft_id ?? ""}</td>
+          <td>
+            <a href="/manifest?${params}">Manifest</a>
+            &nbsp;|&nbsp;
+            <a href="/seatmap?${params}">Seat Map</a>
+          </td>
         `;
         tbody.appendChild(tr);
       });
