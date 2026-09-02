@@ -5,8 +5,12 @@ app = Flask(__name__)
 
 
 @app.get("/")
-def index():
+def home():
     return render_template("index.html")
+
+@app.get("/manifest")
+def manifest():
+    return render_template("manifest.html")
 
 @app.get("/passenger")
 def search_passenger():
@@ -15,6 +19,10 @@ def search_passenger():
 @app.get("/seatmap")
 def seatmap():
     return render_template("seatmap.html")
+
+@app.get("/all-flights")
+def all_flights_page():
+    return render_template("flights.html")
 
 @app.errorhandler(404)
 def not_found(e):

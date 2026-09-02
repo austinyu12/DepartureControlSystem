@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All Flights</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f4f6f9; color: #1a1a2e; }
+
+    header {
+      background: #1a1a2e;
+      color: white;
+      padding: 16px 32px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    main { max-width: 1100px; margin: 32px auto; padding: 0 24px; }
+
+    .status {
+      margin: 0 0 16px;
+      font-size: 0.9rem;
+      color: #555;
+      min-height: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      font-size: 0.9rem;
+    }
+
+    thead { background: #1a1a2e; color: white; }
+    th { padding: 12px 14px; text-align: left; font-weight: 500; }
+    td { padding: 10px 14px; border-bottom: 1px solid #eef0f4; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f0f3ff; }
+
+    .empty { text-align: center; padding: 40px; color: #888; }
+  </style>
+</head>
+<body>
+
+<header>
+  All Flights
+  <a href="/" style="color:white; float:right; font-size:0.9rem; margin-left:16px;">Home</a>
+  <a href="/manifest" style="color:white; float:right; font-size:0.9rem;">Manifest Viewer</a>
+</header>
+
+<main>
+
+  <div class="status" id="status"></div>
+
+  <table id="flights-table" style="display:none;">
+    <thead>
+      <tr>
+        <th>Flight No.</th>
+        <th>Date</th>
+        <th>Origin</th>
+        <th>Destination</th>
+        <th>Operator</th>
+        <th>Aircraft</th>
+      </tr>
+    </thead>
+    <tbody id="flights-body"></tbody>
+  </table>
+
+</main>
+
+<script>
+  function setStatus(msg, isError) {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = isError ? "status error" : "status";
+  }
+
+  fetch("/flights")
+    .then(r => r.json())
+    .then(rows => {
+      const table = document.getElementById("flights-table");
+      const tbody = document.getElementById("flights-body");
+      tbody.innerHTML = "";
+
+      if (rows.length === 0) {
+        setStatus("No flights found.", false);
+        return;
+      }
+
+      setStatus(`${rows.length} flight${rows.length !== 1 ? "s" : ""}`, false);
+      rows.forEach(f => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${f.flight_no ?? ""}</td>
+          <td>${f.flight_date ?? ""}</td>
+          <td>${f.origin ?? ""}</td>
+          <td>${f.destination ?? ""}</td>
+          <td>${f.operator ?? ""}</td>
+          <td>${f.aircraft_id ?? ""}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      table.style.display = "table";
+    })
+    .catch(() => setStatus("Request failed.", true));
+</script>
+
+</body>
+</html>

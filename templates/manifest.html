@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Passenger Search</title>
+  <title>Manifest Viewer</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; background: #f4f6f9; color: #1a1a2e; }
@@ -66,6 +66,8 @@
       min-height: 20px;
     }
 
+    .error { color: #c0392b; }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -81,6 +83,10 @@
     td { padding: 10px 14px; border-bottom: 1px solid #eef0f4; }
     tr:last-child td { border-bottom: none; }
     tbody tr:hover { background: #f0f3ff; }
+
+    .empty { text-align: center; padding: 40px; color: #888; }
+
+    #input-wrapper { display: flex; align-items: center; }
 
     #doc-panel {
       margin-top: 24px;
@@ -99,7 +105,7 @@
 
     .form-row { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
     .form-row label { width: 150px; font-weight: 500; flex-shrink: 0; }
-    .form-row input { flex: 1; min-width: 0; }
+    .form-row input { flex: 1; }
 
     .btn-row { margin-top: 12px; display: flex; gap: 8px; }
 
@@ -109,40 +115,55 @@
     button.danger:hover { background: #a93226; }
 
     #doc-status { margin-top: 8px; font-size: 0.85rem; color: #c0392b; }
-
-    button.small { padding: 4px 10px; font-size: 0.8rem; }
-    .seat-err { color: #c0392b; font-size: 0.8rem; margin-left: 6px; }
   </style>
 </head>
 <body>
 
 <header>
-  Passenger Search
+  Manifest Viewer
   <a href="/" style="color:white; float:right; font-size:0.9rem; margin-left:16px;">Home</a>
-  <a href="/manifest" style="color:white; float:right; font-size:0.9rem;">Manifest Viewer</a>
+  <a href="/passenger" style="color:white; float:right; font-size:0.9rem;">Passenger Search</a>
 </header>
 
 <main>
+
   <div class="search-bar">
-    <label>Search by:</label>
+    <label for="flight-num">Find flight:</label>
+    <input type="text" id="flight-num" placeholder="Flight No. e.g. AB 123" />
+    <input type="text" id="flight-date" placeholder="Date e.g. 2026-04-07" />
+    <input type="text" id="flight-origin" placeholder="Origin e.g. SFO" />
+    <input type="text" id="flight-dest" placeholder="Destination e.g. HND" />
+    <button onclick="findFlight()">Search</button>
+
+    <label for="search-type">Search by:</label>
     <select id="search-type" onchange="onSearchTypeChange()">
-      <option value="name">Name</option>
+      <option value="last_name">Last Name</option>
+      <option value="ssr_code">SSR Code</option>
       <option value="seat">Seat</option>
     </select>
 
-    <div id="name-inputs" style="display:contents;">
-      <input type="text" id="last-name" placeholder="Last name">
-      <input type="text" id="first-name" placeholder="First name">
+    <div id="input-wrapper">
+      <input type="text" id="text-input" placeholder="Enter last name..." />
+      <select id="cabin-select" style="display:none;">
+        <option value="Business">Business</option>
+        <option value="Economy">Economy</option>
+        <option value="Premium Eco">Premium Eco</option>
+      </select>
+      <select id="ssr-select" style="display:none;"></select>
+      <input type="text" id="seat-input" placeholder="Seat e.g. 12A" style="display:none;" />
     </div>
 
-    <div id="seat-inputs" style="display:none;">
-      <input type="text" id="seat-input" placeholder="Seat e.g. 12A">
-      <input type="text" id="airline-input" placeholder="Airline e.g. AB">
-      <input type="text" id="flightnum-input" placeholder="Flight No. e.g. 123">
-      <input type="text" id="date-input" placeholder="Date e.g. 2026-04-07">
-    </div>
+    <button onclick="findPax()">Search</button>
+  </div>
 
-    <button type="button" onclick="doSearch()">Search</button>
+  <div class="search-bar">
+    <label>Filter by Cabin:</label>
+    <select id="cabin-filter" onchange="applyFilters()">
+      <option value="">All</option>
+      <option value="Business">Business</option>
+      <option value="Economy">Economy</option>
+      <option value="Premium Eco">Premium Eco</option>
+    </select>
   </div>
 
   <div class="status" id="status"></div>
@@ -150,8 +171,6 @@
   <table id="results-table" style="display:none;">
     <thead>
       <tr>
-        <th>Flight</th>
-        <th>Date</th>
         <th>Seat</th>
         <th>Last Name</th>
         <th>First Name</th>
@@ -207,62 +226,107 @@
 </main>
 
 <script>
-  let searchResults = [];
+  let allPassengers = [];
+  let displayedPassengers = [];
   let currentDocIdx = -1;
+  let currFlightNum = "";
+  let currFlightDate = "";
+  // Populate SSR dropdown on page load
+  fetch("/ssr_codes")
+    .then(r => r.json())
+    .then(codes => {
+      const sel = document.getElementById("ssr-select");
+      codes.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.code;
+        opt.textContent = `${c.code} — ${c.description}`;
+        sel.appendChild(opt);
+      });
+    });
+  
+  function findFlight() {
+    const flightNum = document.getElementById("flight-num").value.trim();
+    const flightDate = document.getElementById("flight-date").value.trim();
+    const flightOrigin = document.getElementById("flight-origin").value.trim();
+    const flightDest = document.getElementById("flight-dest").value.trim();
+    const url = `/flights/${encodeURIComponent(flightNum)}`
+              + `/${encodeURIComponent(flightDate)}`
+              + `/${encodeURIComponent(flightOrigin)}`
+              + `/${encodeURIComponent(flightDest)}`
+              + `/passengers`
+    fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      allPassengers = data;
+      renderResults(data);
+      currFlightNum = flightNum;
+      currFlightDate = flightDate;
+    })
+    .catch(() => setStatus("Flight not found.", true));
+  }
 
   function onSearchTypeChange() {
     const type = document.getElementById("search-type").value;
-    document.getElementById("name-inputs").style.display = type === "name" ? "contents" : "none";
-    document.getElementById("seat-inputs").style.display = type === "seat" ? "" : "none";
+    document.getElementById("text-input").style.display = type === "last_name" ? "" : "none";
+    document.getElementById("ssr-select").style.display = type === "ssr_code" ? "" : "none";
+    document.getElementById("seat-input").style.display = type === "seat" ? "" : "none";
   }
 
-  function doSearch() {
-    const type = document.getElementById("search-type").value;
-    let url;
+  function applyFilters() {
+    if (allPassengers.length === 0) return;
+    applyAll();
+  }
 
-    if (type === "name") {
-      const last = document.getElementById("last-name").value.trim();
-      const first = document.getElementById("first-name").value.trim();
-      if (!last && !first) { setStatus("Enter at least one name."); return; }
-      url = `/passengers/search?last_name=${encodeURIComponent(last)}`;
-    } else {
-      const seat = document.getElementById("seat-input").value.trim();
-      const airline = document.getElementById("airline-input").value.trim();
-      const flightNum = document.getElementById("flightnum-input").value.trim();
-      const date = document.getElementById("date-input").value.trim();
-      if (!seat || !airline || !flightNum || !date) { setStatus("All fields required."); return; }
-      url = `/passengers/search?seat_num=${encodeURIComponent(seat)}&flight_num=${encodeURIComponent(airline + " " + flightNum)}&departure_date=${encodeURIComponent(date)}`;
+  function findPax() {
+    if (allPassengers.length === 0) {
+      setStatus("Load a flight first.", false);
+      return;
+    }
+    applyAll();
+  }
+
+  function applyAll() {
+    const cabin = document.getElementById("cabin-filter").value;
+    const type = document.getElementById("search-type").value;
+    let filtered = allPassengers;
+
+    if (cabin) {
+      filtered = filtered.filter(p => p.cabin_class === cabin);
     }
 
-    document.getElementById("doc-panel").style.display = "none";
-    fetch(url)
-      .then(r => r.json())
-      .then(data => renderResults(data))
-      .catch(() => setStatus("Request failed."));
+    if (type === "last_name") {
+      const val = document.getElementById("text-input").value.trim().toUpperCase();
+      if (val) filtered = filtered.filter(p => p.last_name && p.last_name.toUpperCase().includes(val));
+    } else if (type === "ssr_code") {
+      const val = document.getElementById("ssr-select").value;
+      if (val) filtered = filtered.filter(p => p.ssr_codes && p.ssr_codes.includes(val));
+    } else if (type === "seat") {
+      const val = document.getElementById("seat-input").value.trim().toUpperCase();
+      if (val) filtered = filtered.filter(p => p.seat && p.seat.toUpperCase() === val);
+    }
+
+    renderResults(filtered);
   }
 
   function renderResults(rows) {
-    searchResults = rows;
+    displayedPassengers = rows;
     const tbody = document.getElementById("results-body");
     const table = document.getElementById("results-table");
     tbody.innerHTML = "";
+
     if (rows.length === 0) {
-      setStatus("No results found.");
+      setStatus("No results found.", false);
       table.style.display = "none";
       document.getElementById("doc-panel").style.display = "none";
       return;
     }
-    setStatus(`${rows.length} result${rows.length !== 1 ? "s" : ""}`);
+
+    setStatus(`${rows.length} result${rows.length !== 1 ? "s" : ""}`, false);
     rows.forEach((p, i) => {
       const hasDoc = p.document_type && p.document_no;
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${p.flight_no ?? ""}</td>
-        <td>${p.flight_date ?? ""}</td>
-        <td id="seat-cell-${i}">
-          <span id="seat-text-${i}">${p.seat ?? ""}</span>
-          <button type="button" class="small secondary" onclick="editSeat(${i})">Change</button>
-        </td>
+        <td>${p.seat ?? ""}</td>
         <td>${p.last_name ?? ""}</td>
         <td>${p.first_name ?? ""}</td>
         <td>${p.cabin_class ?? ""}</td>
@@ -277,7 +341,7 @@
 
   function openDoc(idx) {
     currentDocIdx = idx;
-    const p = searchResults[idx];
+    const p = displayedPassengers[idx];
     document.getElementById("doc-passenger-name").textContent = `${p.first_name} ${p.last_name}`;
     document.getElementById("doc-panel").style.display = "";
     document.getElementById("doc-status").textContent = "";
@@ -305,7 +369,7 @@
   }
 
   function showAddForm() {
-    const p = searchResults[currentDocIdx];
+    const p = displayedPassengers[currentDocIdx];
     document.getElementById("doc-view").style.display = "none";
     document.getElementById("doc-form").style.display = "";
     document.getElementById("form-mode").value = "add";
@@ -320,7 +384,7 @@
   }
 
   function showEditForm() {
-    const p = searchResults[currentDocIdx];
+    const p = displayedPassengers[currentDocIdx];
     fetch(`/travel_documents/${p.document_type}/${p.document_no}`)
       .then(r => r.json())
       .then(doc => {
@@ -361,7 +425,7 @@
         body: JSON.stringify(body),
       });
     } else {
-      const p = searchResults[currentDocIdx];
+      const p = displayedPassengers[currentDocIdx];
       req = fetch(`/travel_documents/${p.document_type}/${p.document_no}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -373,8 +437,9 @@
       .then(r => r.json())
       .then(resp => {
         if (resp.error) { setDocStatus("Error: " + resp.error); return; }
-        searchResults[currentDocIdx].document_type = docType;
-        searchResults[currentDocIdx].document_no = docNo;
+        displayedPassengers[currentDocIdx].document_type = docType;
+        displayedPassengers[currentDocIdx].document_no = docNo;
+        // Refresh the row's button label without re-rendering the whole table
         const btn = document.getElementById("results-body")
           .querySelectorAll("tr")[currentDocIdx].querySelector("button");
         btn.textContent = "View Doc";
@@ -385,13 +450,13 @@
 
   function deleteDoc() {
     if (!confirm("Delete this travel document?")) return;
-    const p = searchResults[currentDocIdx];
+    const p = displayedPassengers[currentDocIdx];
     fetch(`/travel_documents/${p.document_type}/${p.document_no}`, { method: "DELETE" })
       .then(r => r.json())
       .then(resp => {
         if (resp.error) { setDocStatus("Error: " + resp.error); return; }
-        searchResults[currentDocIdx].document_type = null;
-        searchResults[currentDocIdx].document_no = null;
+        displayedPassengers[currentDocIdx].document_type = null;
+        displayedPassengers[currentDocIdx].document_no = null;
         const btn = document.getElementById("results-body")
           .querySelectorAll("tr")[currentDocIdx].querySelector("button");
         btn.textContent = "Add Doc";
@@ -401,7 +466,7 @@
   }
 
   function cancelForm() {
-    const p = searchResults[currentDocIdx];
+    const p = displayedPassengers[currentDocIdx];
     if (p.document_type && p.document_no) {
       openDoc(currentDocIdx);
     } else {
@@ -409,56 +474,20 @@
     }
   }
 
-  function setStatus(msg) {
-    document.getElementById("status").textContent = msg;
-  }
-
   function setDocStatus(msg) {
     document.getElementById("doc-status").textContent = msg;
   }
 
-  function editSeat(idx) {
-    const p = searchResults[idx];
-    const cell = document.getElementById(`seat-cell-${idx}`);
-    cell.innerHTML = `
-      <input type="text" id="seat-input-${idx}" value="${p.seat ?? ""}" style="width:80px" placeholder="e.g. 14C">
-      <button type="button" onclick="saveSeat(${idx})">Save</button>
-      <button type="button" class="secondary" onclick="cancelSeat(${idx})">Cancel</button>
-      <span class="seat-err" id="seat-err-${idx}"></span>
-    `;
-    document.getElementById(`seat-input-${idx}`).focus();
+  function setStatus(msg, isError) {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = isError ? "status error" : "status";
   }
 
-  function cancelSeat(idx) {
-    const p = searchResults[idx];
-    const cell = document.getElementById(`seat-cell-${idx}`);
-    cell.innerHTML = `
-      <span id="seat-text-${idx}">${p.seat ?? ""}</span>
-      <button type="button" class="small secondary" onclick="editSeat(${idx})">Change</button>
-    `;
-  }
-
-  function saveSeat(idx) {
-    const p = searchResults[idx];
-    const newSeat = document.getElementById(`seat-input-${idx}`).value.trim();
-    fetch(`/passengers/${p.id}/seat`, {
-      method: "PUT",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({seat: newSeat})
-    })
-      .then(r => r.json())
-      .then(resp => {
-        if (resp.error) {
-          document.getElementById(`seat-err-${idx}`).textContent = resp.error;
-          return;
-        }
-        searchResults[idx].seat = resp.seat;
-        cancelSeat(idx);
-      })
-      .catch(() => {
-        document.getElementById(`seat-err-${idx}`).textContent = "Request failed.";
-      });
-  }
+  // Allow Enter key to trigger search
+  document.getElementById("text-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") findPax();
+  });
 </script>
 
 </body>
