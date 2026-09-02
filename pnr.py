@@ -15,12 +15,41 @@ def init_db():
     conn = get_connection()
     with conn:
         conn.executescript("""
+            CREATE TABLE IF NOT EXISTS aircraft_types (
+                aircraft_type TEXT PRIMARY KEY,
+                manufacturer  TEXT NOT NULL,
+                model         TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS seat_config_layouts (
+                config_code   TEXT PRIMARY KEY,
+                aircraft_type TEXT NOT NULL REFERENCES aircraft_types(aircraft_type),
+                description   TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS seat_configs (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                config_code  TEXT NOT NULL REFERENCES seat_config_layouts(config_code),
+                cabin_class  TEXT NOT NULL,
+                row_first    INTEGER NOT NULL,
+                row_last     INTEGER NOT NULL,
+                seat_columns TEXT NOT NULL,
+                aisle_after  TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS aircraft (
+                aircraft_id   TEXT PRIMARY KEY,
+                aircraft_type TEXT NOT NULL REFERENCES aircraft_types(aircraft_type),
+                config_code   TEXT REFERENCES seat_config_layouts(config_code)
+            );
+
             CREATE TABLE IF NOT EXISTS flights (
-                flight_no   TEXT NOT NULL,
-                flight_date TEXT NOT NULL,
-                origin      TEXT NOT NULL,
-                destination TEXT NOT NULL,
-                operator    TEXT,
+                flight_no     TEXT NOT NULL,
+                flight_date   TEXT NOT NULL,
+                origin        TEXT NOT NULL,
+                destination   TEXT NOT NULL,
+                operator      TEXT,
+                aircraft_id   TEXT REFERENCES aircraft(aircraft_id),
                 PRIMARY KEY (flight_no, flight_date, origin, destination)
             );
                            

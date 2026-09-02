@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seat Map</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f4f6f9; color: #1a1a2e; }
+
+    header {
+      background: #1a1a2e;
+      color: white;
+      padding: 16px 32px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    main { max-width: 1100px; margin: 32px auto; padding: 0 24px; }
+
+    .search-bar {
+      background: white;
+      border-radius: 8px;
+      padding: 20px 24px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      flex-wrap: wrap;
+    }
+
+    .search-bar label { font-weight: 500; white-space: nowrap; }
+
+    input[type="text"] {
+      padding: 8px 12px;
+      border: 1px solid #cdd0d8;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      background: white;
+      min-width: 140px;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #4f6ef7;
+    }
+
+    button {
+      padding: 8px 20px;
+      background: #4f6ef7;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover { background: #3a58d6; }
+
+    .status {
+      margin: 16px 0 8px;
+      font-size: 0.9rem;
+      color: #555;
+      min-height: 20px;
+    }
+
+    .error { color: #c0392b; }
+
+    #map-container { margin-top: 8px; }
+
+    .cabin-section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .cabin-section h3 {
+      font-size: 1rem;
+      margin-bottom: 14px;
+      color: #1a1a2e;
+    }
+
+    .seat-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .row-label {
+      width: 32px;
+      font-size: 0.8rem;
+      color: #888;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .seat {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 500;
+      border: 1px solid #cdd0d8;
+      background: #f0f3ff;
+      color: #4f6ef7;
+      cursor: default;
+      flex-shrink: 0;
+    }
+
+    .seat.occupied {
+      background: #4f6ef7;
+      color: white;
+      border-color: #4f6ef7;
+      cursor: pointer;
+    }
+
+    .seat.occupied:hover { background: #3a58d6; }
+
+    .aisle-gap { width: 24px; flex-shrink: 0; }
+
+    #pax-panel {
+      margin-top: 16px;
+      background: white;
+      border-radius: 8px;
+      padding: 16px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      max-width: 400px;
+    }
+
+    #pax-panel h3 { font-size: 1rem; margin-bottom: 8px; }
+    #pax-panel div { font-size: 0.9rem; margin-bottom: 4px; color: #444; }
+  </style>
+</head>
+<body>
+
+<header>
+  Seat Map
+  <a href="/" style="color:white; float:right; font-size:0.9rem;">Manifest</a>
+</header>
+
+<main>
+
+  <div class="search-bar">
+    <label for="flight-num">Flight:</label>
+    <input type="text" id="flight-num" placeholder="Flight No. e.g. AB 123" />
+    <input type="text" id="flight-date" placeholder="Date e.g. 2026-04-07" />
+    <input type="text" id="flight-origin" placeholder="Origin e.g. SFO" />
+    <input type="text" id="flight-dest" placeholder="Destination e.g. HND" />
+    <button onclick="loadSeatMap()">Load Seat Map</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div id="map-container"></div>
+
+  <div id="pax-panel" style="display:none;">
+    <h3 id="pax-name"></h3>
+    <div>Seat: <span id="pax-seat"></span></div>
+    <div>Cabin: <span id="pax-cabin"></span></div>
+    <div>Record Locator: <span id="pax-locator"></span></div>
+  </div>
+
+</main>
+
+<script>
+  function setStatus(msg, isError) {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = isError ? "status error" : "status";
+  }
+
+  async function loadSeatMap() {
+    const flightNo = document.getElementById("flight-num").value.trim();
+    const flightDate = document.getElementById("flight-date").value.trim();
+    const origin = document.getElementById("flight-origin").value.trim();
+    const dest = document.getElementById("flight-dest").value.trim();
+
+    if (!flightNo || !flightDate || !origin || !dest) {
+      setStatus("Enter flight number, date, origin, and destination.", true);
+      return;
+    }
+
+    const base = `/flights/${encodeURIComponent(flightNo)}`
+               + `/${encodeURIComponent(flightDate)}`
+               + `/${encodeURIComponent(origin)}`
+               + `/${encodeURIComponent(dest)}`;
+
+    document.getElementById("map-container").innerHTML = "";
+    document.getElementById("pax-panel").style.display = "none";
+    setStatus("Loading...", false);
+
+    let config, passengers;
+    try {
+      const [configRes, paxRes] = await Promise.all([
+        fetch(`${base}/seat_config`),
+        fetch(`${base}/passengers`),
+      ]);
+      config = await configRes.json();
+      passengers = await paxRes.json();
+    } catch (e) {
+      setStatus("Request failed.", true);
+      return;
+    }
+
+    if (config.error) {
+      setStatus(config.error, true);
+      return;
+    }
+    if (config.length === 0) {
+      setStatus("No seat configuration found for this flight's aircraft.", true);
+      return;
+    }
+
+    setStatus(`${passengers.length} passenger${passengers.length !== 1 ? "s" : ""} on this flight`, false);
+    renderSeatMap(config, passengers);
+  }
+
+  function renderSeatMap(config, passengers) {
+    const occBySeat = new Map();
+    passengers.forEach(p => {
+      if (p.seat) occBySeat.set(p.seat.toUpperCase(), p);
+    });
+
+    const container = document.getElementById("map-container");
+    container.innerHTML = "";
+
+    config.forEach(cabin => {
+      const columns = cabin.seat_columns.split(",");
+      const aisleAfter = new Set(cabin.aisle_after.split(","));
+
+      const section = document.createElement("div");
+      section.className = "cabin-section";
+
+      const heading = document.createElement("h3");
+      heading.textContent = cabin.cabin_class;
+      section.appendChild(heading);
+
+      for (let row = cabin.row_first; row <= cabin.row_last; row++) {
+        const rowEl = document.createElement("div");
+        rowEl.className = "seat-row";
+
+        const label = document.createElement("div");
+        label.className = "row-label";
+        label.textContent = row;
+        rowEl.appendChild(label);
+
+        columns.forEach(col => {
+          const seatLabel = `${row}${col}`;
+          const pax = occBySeat.get(seatLabel);
+
+          const seatEl = document.createElement("div");
+          seatEl.className = pax ? "seat occupied" : "seat";
+          seatEl.textContent = col;
+          seatEl.title = pax ? `${pax.first_name} ${pax.last_name}` : seatLabel;
+          if (pax) {
+            seatEl.onclick = () => showPax(pax, seatLabel, cabin.cabin_class);
+          }
+          rowEl.appendChild(seatEl);
+
+          if (aisleAfter.has(col)) {
+            const gap = document.createElement("div");
+            gap.className = "aisle-gap";
+            rowEl.appendChild(gap);
+          }
+        });
+
+        section.appendChild(rowEl);
+      }
+
+      container.appendChild(section);
+    });
+  }
+
+  function showPax(pax, seatLabel, cabinClass) {
+    document.getElementById("pax-name").textContent = `${pax.first_name} ${pax.last_name}`;
+    document.getElementById("pax-seat").textContent = seatLabel;
+    document.getElementById("pax-cabin").textContent = cabinClass;
+    document.getElementById("pax-locator").textContent = pax.record_locator ?? "";
+    document.getElementById("pax-panel").style.display = "";
+  }
+</script>
+
+</body>
+</html>

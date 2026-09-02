@@ -12,6 +12,10 @@ def index():
 def search_passenger():
     return render_template("passenger.html")
 
+@app.get("/seatmap")
+def seatmap():
+    return render_template("seatmap.html")
+
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({"error": "not found"}), 404
@@ -44,6 +48,28 @@ def flight_passengers(flight_no, flight_date, origin, destination):
     finally:
         conn.close()
 
+@app.get("/flights/<flight_no>/<flight_date>/<origin>/<destination>/seat_config")
+def flight_seat_config(flight_no, flight_date, origin, destination):
+    conn = get_connection()
+    try:
+        flight = conn.execute(
+            """SELECT a.config_code
+               FROM flights f JOIN aircraft a ON f.aircraft_id = a.aircraft_id
+               WHERE f.flight_no=? AND f.flight_date=?
+               AND f.origin=? AND f.destination=?""",
+            (flight_no, flight_date, origin, destination),
+        ).fetchone()
+        if not flight or not flight["config_code"]:
+            return jsonify({"error": "No seat config assigned to this flight"}), 404
+        rows = conn.execute(
+            """SELECT * FROM seat_configs
+               WHERE config_code=?
+               ORDER BY row_first""",
+            (flight["config_code"],),
+        ).fetchall()
+        return jsonify([dict(r) for r in rows])
+    finally:
+        conn.close()
 
 @app.get("/passengers/search")
 def search_passengers():
@@ -89,6 +115,36 @@ def search_passengers():
             return jsonify({"error": "provide one of: last_name, cabin_class, ssr_code, or seat_num+flight_num+departure_date"}), 400
 
         return jsonify([dict(r) for r in rows])
+    finally:
+        conn.close()
+
+@app.put("/passengers/<int:pax_id>/seat")
+def assign_seat(pax_id):
+    data = request.get_json()
+    new_seat = (data.get("seat") or "").strip() or None
+    conn = get_connection()
+    try:
+        pax = conn.execute(
+            "SELECT flight_no, flight_date, origin, destination FROM passengers WHERE id=?",
+            (pax_id,)
+        ).fetchone()
+        if not pax:
+            return jsonify({"error": "Passenger not found"}), 404
+        if new_seat:
+            conflict = conn.execute(
+                """SELECT last_name, first_name FROM passengers
+                   WHERE seat=? AND flight_no=? AND flight_date=? AND origin=? AND destination=? AND id!=?""",
+                (new_seat, pax["flight_no"], pax["flight_date"],
+                 pax["origin"], pax["destination"], pax_id)
+            ).fetchone()
+            if conflict:
+                return jsonify({
+                    "error": f"Seat {new_seat} is already assigned to {conflict['last_name']}, {conflict['first_name']}",
+                    "conflict": dict(conflict)
+                }), 409
+        conn.execute("UPDATE passengers SET seat=? WHERE id=?", (new_seat, pax_id))
+        conn.commit()
+        return jsonify({"success": True, "seat": new_seat})
     finally:
         conn.close()
 

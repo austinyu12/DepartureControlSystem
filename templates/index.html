@@ -272,38 +272,39 @@
   }
 
   function applyFilters() {
-    const cabin = document.getElementById("cabin-filter").value;
-    const filtered = allPassengers.filter(p => {
-      return cabin === "" || p.cabin_class === cabin;
-    });
-    renderResults(filtered);
+    if (allPassengers.length === 0) return;
+    applyAll();
   }
 
   function findPax() {
-    const type = document.getElementById("search-type").value;
-    let url;
+    if (allPassengers.length === 0) {
+      setStatus("Load a flight first.", false);
+      return;
+    }
+    applyAll();
+  }
 
-    if (type === "last_name") {
-      const val = document.getElementById("text-input").value.trim();
-      if (!val) { setStatus("Enter a last name to search.", false); return; }
-      url = `/passengers/search?last_name=${encodeURIComponent(val)}`;
-    } else if (type === "ssr_code") {
-      const val = document.getElementById("ssr-select").value;
-      if (!val) { setStatus("No SSR codes available.", false); return; }
-      url = `/passengers/search?ssr_code=${encodeURIComponent(val)}`;
-    } else if (type === "seat") {
-      const seat = document.getElementById("seat-input").value.trim();
-      if (!seat) { setStatus("Enter a seat number.", false); return; }
-      url = `/passengers/search?seat_num=${encodeURIComponent(seat)}`
-      + `&flight_num=${encodeURIComponent(currFlightNum)}`
-      + `&departure_date=${encodeURIComponent(currFlightDate)}`;
+  function applyAll() {
+    const cabin = document.getElementById("cabin-filter").value;
+    const type = document.getElementById("search-type").value;
+    let filtered = allPassengers;
+
+    if (cabin) {
+      filtered = filtered.filter(p => p.cabin_class === cabin);
     }
 
-    setStatus("Loading...", false);
-    fetch(url)
-      .then(r => r.json())
-      .then(data => renderResults(data))
-      .catch(() => setStatus("Request failed.", true));
+    if (type === "last_name") {
+      const val = document.getElementById("text-input").value.trim().toUpperCase();
+      if (val) filtered = filtered.filter(p => p.last_name && p.last_name.toUpperCase().includes(val));
+    } else if (type === "ssr_code") {
+      const val = document.getElementById("ssr-select").value;
+      if (val) filtered = filtered.filter(p => p.ssr_codes && p.ssr_codes.includes(val));
+    } else if (type === "seat") {
+      const val = document.getElementById("seat-input").value.trim().toUpperCase();
+      if (val) filtered = filtered.filter(p => p.seat && p.seat.toUpperCase() === val);
+    }
+
+    renderResults(filtered);
   }
 
   function renderResults(rows) {

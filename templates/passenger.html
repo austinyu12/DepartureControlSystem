@@ -109,6 +109,9 @@
     button.danger:hover { background: #a93226; }
 
     #doc-status { margin-top: 8px; font-size: 0.85rem; color: #c0392b; }
+
+    button.small { padding: 4px 10px; font-size: 0.8rem; }
+    .seat-err { color: #c0392b; font-size: 0.8rem; margin-left: 6px; }
   </style>
 </head>
 <body>
@@ -146,6 +149,8 @@
   <table id="results-table" style="display:none;">
     <thead>
       <tr>
+        <th>Flight</th>
+        <th>Date</th>
         <th>Seat</th>
         <th>Last Name</th>
         <th>First Name</th>
@@ -251,7 +256,12 @@
       const hasDoc = p.document_type && p.document_no;
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${p.seat ?? ""}</td>
+        <td>${p.flight_no ?? ""}</td>
+        <td>${p.flight_date ?? ""}</td>
+        <td id="seat-cell-${i}">
+          <span id="seat-text-${i}">${p.seat ?? ""}</span>
+          <button type="button" class="small secondary" onclick="editSeat(${i})">Change</button>
+        </td>
         <td>${p.last_name ?? ""}</td>
         <td>${p.first_name ?? ""}</td>
         <td>${p.cabin_class ?? ""}</td>
@@ -404,6 +414,49 @@
 
   function setDocStatus(msg) {
     document.getElementById("doc-status").textContent = msg;
+  }
+
+  function editSeat(idx) {
+    const p = searchResults[idx];
+    const cell = document.getElementById(`seat-cell-${idx}`);
+    cell.innerHTML = `
+      <input type="text" id="seat-input-${idx}" value="${p.seat ?? ""}" style="width:80px" placeholder="e.g. 14C">
+      <button type="button" onclick="saveSeat(${idx})">Save</button>
+      <button type="button" class="secondary" onclick="cancelSeat(${idx})">Cancel</button>
+      <span class="seat-err" id="seat-err-${idx}"></span>
+    `;
+    document.getElementById(`seat-input-${idx}`).focus();
+  }
+
+  function cancelSeat(idx) {
+    const p = searchResults[idx];
+    const cell = document.getElementById(`seat-cell-${idx}`);
+    cell.innerHTML = `
+      <span id="seat-text-${idx}">${p.seat ?? ""}</span>
+      <button type="button" class="small secondary" onclick="editSeat(${idx})">Change</button>
+    `;
+  }
+
+  function saveSeat(idx) {
+    const p = searchResults[idx];
+    const newSeat = document.getElementById(`seat-input-${idx}`).value.trim();
+    fetch(`/passengers/${p.id}/seat`, {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({seat: newSeat})
+    })
+      .then(r => r.json())
+      .then(resp => {
+        if (resp.error) {
+          document.getElementById(`seat-err-${idx}`).textContent = resp.error;
+          return;
+        }
+        searchResults[idx].seat = resp.seat;
+        cancelSeat(idx);
+      })
+      .catch(() => {
+        document.getElementById(`seat-err-${idx}`).textContent = "Request failed.";
+      });
   }
 </script>
 
